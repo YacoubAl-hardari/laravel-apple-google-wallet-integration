@@ -43,16 +43,8 @@ class StampCardImageGenerator
 
         $this->drawStripBackground($image, $width, $height);
 
-        $completedIconPath = $this->resolveIconPath(
-            config('google-wallet.stamp_completed_icon'),
-            $program->logoPath,
-            $program->imageUrl,
-        );
-        $emptyIconPath = $this->resolveIconPath(
-            config('google-wallet.stamp_empty_icon'),
-            null,
-            null,
-        );
+        $completedIconPath = $this->resolveStampIconPath(config('google-wallet.stamp_completed_icon'));
+        $emptyIconPath = $this->resolveStampIconPath(config('google-wallet.stamp_empty_icon'));
 
         $stampIndex = 0;
         foreach ($rows as $rowIndex => $colsInRow) {
@@ -105,6 +97,18 @@ class StampCardImageGenerator
         ?string $completedIconPath,
         ?string $emptyIconPath
     ): void {
+        $radius = (int) ($size / 2);
+        $centerX = $x + $radius;
+        $centerY = $y + $radius;
+
+        $iconPath = $isCompleted ? $completedIconPath : $emptyIconPath;
+        if ($iconPath && ($icon = $this->loadImage($iconPath))) {
+            $this->pasteStampIcon($image, $icon, $centerX, $centerY, $size);
+            imagedestroy($icon);
+
+            return;
+        }
+
         $borderRgb = $this->hexToRgb(config('google-wallet.stamp_border_color', '#FFFFFF'));
         $emptyRgb = $this->hexToRgb(config('google-wallet.stamp_empty_color', '#1A1A1A'));
         $filledRgb = $this->hexToRgb(config('google-wallet.stamp_filled_color', '#FFFFFF'));
@@ -113,81 +117,8 @@ class StampCardImageGenerator
         $emptyColor = imagecolorallocatealpha($image, $emptyRgb[0], $emptyRgb[1], $emptyRgb[2], $isCompleted ? 0 : 40);
         $filledColor = imagecolorallocate($image, $filledRgb[0], $filledRgb[1], $filledRgb[2]);
 
-        $radius = (int) ($size / 2);
-        $centerX = $x + $radius;
-        $centerY = $y + $radius;
-
         imagefilledellipse($image, $centerX, $centerY, $size, $size, $isCompleted ? $filledColor : $emptyColor);
         imageellipse($image, $centerX, $centerY, $size, $size, $borderColor);
-
-        $iconPath = $isCompleted ? $completedIconPath : ($emptyIconPath ?: $completedIconPath);
-        if (!$iconPath) {
-            return;
-        }
-
-        $icon = $this->loadImage($iconPath);
-        if (!$icon) {
-            return;
-        }
-
-        if (!$isCompleted && !$emptyIconPath && $completedIconPath) {
-            $this->pasteIconDimmed($image, $icon, $centerX, $centerY, (int) ($size * 0.62), 45);
-        } else {
-            $this->pasteIcon($image, $icon, $centerX, $centerY, (int) ($size * 0.62));
-        }
-
-        imagedestroy($icon);
-    }
-
-    protected function pasteIcon($canvas, $icon, int $centerX, int $centerY, int $iconSize): void
-    {
-        $destX = $centerX - (int) ($iconSize / 2);
-        $destY = $centerY - (int) ($iconSize / 2);
-
-        imagecopyresampled(
-            $canvas,
-            $icon,
-            $destX,
-            $destY,
-            0,
-            0,
-            $iconSize,
-            $iconSize,
-            imagesx($icon),
-            imagesy($icon)
-        );
-    }
-
-    protected function pasteIconDimmed($canvas, $icon, int $centerX, int $centerY, int $iconSize, int $alpha): void
-    {
-        $w = imagesx($icon);
-        $h = imagesy($icon);
-        $tmp = imagecreatetruecolor($iconSize, $iconSize);
-        imagesavealpha($tmp, true);
-        $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
-        imagefill($tmp, 0, 0, $transparent);
-
-        imagecopyresampled($tmp, $icon, 0, 0, 0, 0, $iconSize, $iconSize, $w, $h);
-
-        for ($x = 0; $x < $iconSize; $x++) {
-            for ($y = 0; $y < $iconSize; $y++) {
-                $rgba = imagecolorat($tmp, $x, $y);
-                $a = ($rgba >> 24) & 0x7F;
-                if ($a >= 127) {
-                    continue;
-                }
-                $r = ($rgba >> 16) & 0xFF;
-                $g = ($rgba >> 8) & 0xFF;
-                $b = $rgba & 0xFF;
-                $color = imagecolorallocatealpha($tmp, $r, $g, $b, min(127, $a + $alpha));
-                imagesetpixel($tmp, $x, $y, $color);
-            }
-        }
-
-        $destX = $centerX - (int) ($iconSize / 2);
-        $destY = $centerY - (int) ($iconSize / 2);
-        imagecopy($canvas, $tmp, $destX, $destY, 0, 0, $iconSize, $iconSize);
-        imagedestroy($tmp);
     }
 
     protected function drawStatsRow($image, int $width, int $y, int $total, int $filled, int $rewards): void

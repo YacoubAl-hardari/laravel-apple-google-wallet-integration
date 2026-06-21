@@ -45,24 +45,48 @@ class WalletStudioPreviewService
             memberName: (string) ($input['preview_member'] ?? 'Preview'),
         );
 
-        $platform = (string) ($input['platform'] ?? 'both');
+        $platform = (string) ($input['platform'] ?? 'apple');
         $result = [];
 
-        if (in_array($platform, ['apple', 'both'], true)) {
-            $result['apple_strip_url'] = $this->appleStripGenerator->generate($program, $member);
+        if ($platform === 'apple') {
+            $result['apple_strip_url'] = $this->normalizePublicUrl(
+                $this->appleStripGenerator->generate($program, $member)
+            );
             $result['apple_configured'] = $this->appleWalletService->isConfigured();
             $result['apple_pass_ready'] = $result['apple_configured']
                 && $this->appleWalletService->createPass($program, $member) !== null;
         }
 
-        if (in_array($platform, ['google', 'both'], true)) {
-            $result['google_strip_url'] = $this->googleStripGenerator->generate($program, $member);
+        if ($platform === 'google') {
+            $result['google_strip_url'] = $this->normalizePublicUrl(
+                $this->googleStripGenerator->generate($program, $member)
+            );
             $result['google_configured'] = $this->googleWalletService->isConfigured();
             $result['google_save_url'] = $result['google_configured']
                 ? $this->googleWalletService->saveUrl($program, $member)
                 : null;
+            $result['google_error'] = $result['google_save_url']
+                ? null
+                : $this->googleWalletService->getLastError();
         }
 
         return $result;
+    }
+
+    protected function normalizePublicUrl(?string $url): ?string
+    {
+        if ($url === null || $url === '') {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path) || $path === '') {
+            $path = str_starts_with($url, '/')
+                ? $url
+                : '/storage/' . ltrim(str_replace('\\', '/', $url), '/');
+        }
+
+        return url($path);
     }
 }

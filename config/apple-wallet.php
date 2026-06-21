@@ -30,6 +30,8 @@ return [
     'stamp_empty_fill' => env('APPLE_WALLET_STAMP_EMPTY_FILL', '#FFFFFF'),
     'stamp_empty_border' => env('APPLE_WALLET_STAMP_EMPTY_BORDER', '#FFFFFF'),
     'stamp_border_width' => (int) env('APPLE_WALLET_STAMP_BORDER_WIDTH', 4),
+    'stamp_completed_icon' => env('APPLE_WALLET_STAMP_COMPLETED_ICON'),
+    'stamp_empty_icon' => env('APPLE_WALLET_STAMP_EMPTY_ICON'),
 
     'certificate_store_path' => env('APPLE_WALLET_CERTIFICATE_PATH', storage_path('app/apple-wallet/pass.p12')),
     'certificate_store_password' => env('APPLE_WALLET_CERTIFICATE_PASS', ''),

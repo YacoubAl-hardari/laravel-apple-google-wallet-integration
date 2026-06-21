@@ -21,6 +21,10 @@ class WalletImageUrlResolver
             return $this->fallbackLogo();
         }
 
+        if (! $this->isValidImageUrl($url)) {
+            return $this->fallbackLogo();
+        }
+
         return $url;
     }
 
@@ -41,6 +45,10 @@ class WalletImageUrlResolver
             return null;
         }
 
+        if (! $this->isValidImageUrl($url)) {
+            return null;
+        }
+
         return $url;
     }
 
@@ -54,7 +62,9 @@ class WalletImageUrlResolver
         foreach ($candidates as $candidate) {
             $candidate = $this->rewriteWithPublicBase(trim((string) $candidate));
 
-            if ($this->isPubliclyAccessible($candidate) && str_starts_with(strtolower($candidate), 'https://')) {
+            if ($this->isPubliclyAccessible($candidate)
+                && str_starts_with(strtolower($candidate), 'https://')
+                && $this->isValidImageUrl($candidate)) {
                 return $candidate;
             }
         }
@@ -111,5 +121,36 @@ class WalletImageUrlResolver
         }
 
         return true;
+    }
+
+    protected function isValidImageUrl(string $url): bool
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'HEAD',
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $headers = @get_headers($url, true, $context);
+        if (! is_array($headers) || ! isset($headers[0])) {
+            return false;
+        }
+
+        if (! preg_match('/\s200\s/', (string) $headers[0])) {
+            return false;
+        }
+
+        $type = $headers['Content-Type'] ?? $headers['content-type'] ?? '';
+        if (is_array($type)) {
+            $type = (string) end($type);
+        }
+
+        return str_starts_with(strtolower((string) $type), 'image/');
     }
 }

@@ -110,6 +110,45 @@ trait InteractsWithStampImages
         imagefilledrectangle($image, 0, 0, $width, $height, $overlayColor);
     }
 
+    protected function resolveStampIconPath(mixed $configuredPath): ?string
+    {
+        if ($configuredPath === null || trim((string) $configuredPath) === '') {
+            return null;
+        }
+
+        $local = $this->pathFromUrl((string) $configuredPath);
+        if (! $local || ! is_file($local)) {
+            return null;
+        }
+
+        if (strtolower(pathinfo($local, PATHINFO_EXTENSION)) !== 'png') {
+            return null;
+        }
+
+        return $local;
+    }
+
+    protected function pasteStampIcon($canvas, $icon, int $centerX, int $centerY, int $iconSize): void
+    {
+        $destX = $centerX - (int) ($iconSize / 2);
+        $destY = $centerY - (int) ($iconSize / 2);
+
+        imagealphablending($canvas, true);
+        imagesavealpha($canvas, true);
+        imagecopyresampled(
+            $canvas,
+            $icon,
+            $destX,
+            $destY,
+            0,
+            0,
+            $iconSize,
+            $iconSize,
+            imagesx($icon),
+            imagesy($icon)
+        );
+    }
+
     protected function resolveIconPath(
         ?string $configuredPath,
         ?string $cardLogoPath = null,

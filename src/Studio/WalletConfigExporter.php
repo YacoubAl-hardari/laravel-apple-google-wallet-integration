@@ -110,6 +110,12 @@ class WalletConfigExporter
             $lines[] = 'APPLE_WALLET_STAMP_EMPTY_FILL=' . $this->hex($input['apple_stamp_empty_fill'] ?? '#FFFFFF');
             $lines[] = 'APPLE_WALLET_STAMP_EMPTY_BORDER=' . $this->hex($input['apple_stamp_empty_border'] ?? '#FFFFFF');
             $lines[] = 'APPLE_WALLET_STRIP_BG_OVERLAY=' . (float) ($input['apple_strip_overlay'] ?? 0.55);
+            if (! empty($input['stamp_completed_icon_path'])) {
+                $lines[] = 'APPLE_WALLET_STAMP_COMPLETED_ICON=' . storage_path('app/public/' . ltrim((string) $input['stamp_completed_icon_path'], '/'));
+            }
+            if (! empty($input['stamp_empty_icon_path'])) {
+                $lines[] = 'APPLE_WALLET_STAMP_EMPTY_ICON=' . storage_path('app/public/' . ltrim((string) $input['stamp_empty_icon_path'], '/'));
+            }
             $lines[] = '';
         }
 
@@ -123,6 +129,12 @@ class WalletConfigExporter
             $lines[] = 'GOOGLE_WALLET_STAMP_EMPTY=' . $this->hex($input['google_stamp_empty'] ?? '#1A1A1A');
             $lines[] = 'GOOGLE_WALLET_STAMP_BORDER=' . $this->hex($input['google_stamp_border'] ?? '#FFFFFF');
             $lines[] = 'GOOGLE_WALLET_STAMP_TEXT=' . $this->hex($input['google_stamp_text'] ?? '#FFFFFF');
+            if (! empty($input['stamp_completed_icon_path'])) {
+                $lines[] = 'GOOGLE_WALLET_STAMP_COMPLETED_ICON=' . storage_path('app/public/' . ltrim((string) $input['stamp_completed_icon_path'], '/'));
+            }
+            if (! empty($input['stamp_empty_icon_path'])) {
+                $lines[] = 'GOOGLE_WALLET_STAMP_EMPTY_ICON=' . storage_path('app/public/' . ltrim((string) $input['stamp_empty_icon_path'], '/'));
+            }
         }
 
         return implode("\n", $lines) . "\n";
@@ -210,6 +222,16 @@ class WalletConfigExporter
             $lines[] = "    'strip_background_image' => env('APPLE_WALLET_STRIP_BG_IMAGE', '/storage/" . ltrim((string) $input['strip_bg_path'], '/') . "'),";
         }
 
+        if (! empty($input['stamp_completed_icon_path'])) {
+            $path = str_replace('\\', '/', storage_path('app/public/' . ltrim((string) $input['stamp_completed_icon_path'], '/')));
+            $lines[] = "    'stamp_completed_icon' => env('APPLE_WALLET_STAMP_COMPLETED_ICON', '" . $path . "'),";
+        }
+
+        if (! empty($input['stamp_empty_icon_path'])) {
+            $path = str_replace('\\', '/', storage_path('app/public/' . ltrim((string) $input['stamp_empty_icon_path'], '/')));
+            $lines[] = "    'stamp_empty_icon' => env('APPLE_WALLET_STAMP_EMPTY_ICON', '" . $path . "'),";
+        }
+
         return $lines;
     }
 
@@ -227,6 +249,16 @@ class WalletConfigExporter
 
         if (! empty($input['strip_bg_path'])) {
             $lines[] = "    'stamp_strip_background_image' => env('GOOGLE_WALLET_STAMP_STRIP_BG_IMAGE', '/storage/" . ltrim((string) $input['strip_bg_path'], '/') . "'),";
+        }
+
+        if (! empty($input['stamp_completed_icon_path'])) {
+            $path = str_replace('\\', '/', storage_path('app/public/' . ltrim((string) $input['stamp_completed_icon_path'], '/')));
+            $lines[] = "    'stamp_completed_icon' => env('GOOGLE_WALLET_STAMP_COMPLETED_ICON', '" . $path . "'),";
+        }
+
+        if (! empty($input['stamp_empty_icon_path'])) {
+            $path = str_replace('\\', '/', storage_path('app/public/' . ltrim((string) $input['stamp_empty_icon_path'], '/')));
+            $lines[] = "    'stamp_empty_icon' => env('GOOGLE_WALLET_STAMP_EMPTY_ICON', '" . $path . "'),";
         }
 
         return $lines;

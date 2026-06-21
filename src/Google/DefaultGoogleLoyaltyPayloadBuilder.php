@@ -134,11 +134,11 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
 
     protected function logoUri(?LoyaltyProgramData $program = null): ?string
     {
-        if ($program?->imageUrl) {
-            return $this->imageUrlResolver->resolve($program->imageUrl);
-        }
+        $candidate = $program?->imageUrl
+            ?: config('google-wallet.default_logo')
+            ?: config('google-wallet.fallback_logo');
 
-        return $this->imageUrlResolver->resolve(config('google-wallet.default_logo'));
+        return $this->imageUrlResolver->resolve($candidate);
     }
 
     protected function isStampLayout(): bool

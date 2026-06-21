@@ -45,6 +45,9 @@ class AppleStampStripGenerator
 
         $this->drawStampPanel($image, $panelX, $panelY, $panelW, $panelH);
 
+        $completedIconPath = $this->resolveStampIconPath(config('apple-wallet.stamp_completed_icon'));
+        $emptyIconPath = $this->resolveStampIconPath(config('apple-wallet.stamp_empty_icon'));
+
         $stampIndex = 0;
         foreach ($rows as $rowIndex => $colsInRow) {
             $rowWidth = ($colsInRow * $cell) + (max(0, $colsInRow - 1) * $gap);
@@ -54,7 +57,15 @@ class AppleStampStripGenerator
 
             for ($col = 0; $col < $colsInRow; $col++) {
                 $x = $startX + ($col * ($cell + $gap));
-                $this->drawStampSlot($image, $x, $y, $cell, $stampIndex < $filled);
+                $this->drawStampSlot(
+                    $image,
+                    $x,
+                    $y,
+                    $cell,
+                    $stampIndex < $filled,
+                    $completedIconPath,
+                    $emptyIconPath
+                );
                 $stampIndex++;
             }
         }
@@ -104,11 +115,27 @@ class AppleStampStripGenerator
         imagefilledrectangle($image, $x, $y, $x + $width, $y + $height, $panelColor);
     }
 
-    protected function drawStampSlot($image, int $x, int $y, int $size, bool $isCompleted): void
-    {
+    protected function drawStampSlot(
+        $image,
+        int $x,
+        int $y,
+        int $size,
+        bool $isCompleted,
+        ?string $completedIconPath = null,
+        ?string $emptyIconPath = null,
+    ): void {
         $radius = (int) ($size / 2);
         $centerX = $x + $radius;
         $centerY = $y + $radius;
+
+        $iconPath = $isCompleted ? $completedIconPath : $emptyIconPath;
+        if ($iconPath && ($icon = $this->loadImage($iconPath))) {
+            $this->pasteStampIcon($image, $icon, $centerX, $centerY, $size);
+            imagedestroy($icon);
+
+            return;
+        }
+
         $borderWidth = max(2, (int) config('apple-wallet.stamp_border_width', 4));
 
         $completedRgb = $this->hexToRgb((string) config('apple-wallet.stamp_completed_color', '#E07B2D'));

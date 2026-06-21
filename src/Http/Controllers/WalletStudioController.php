@@ -26,6 +26,8 @@ class WalletStudioController extends Controller
             'langKeys' => WalletStudioDefaults::langKeys(),
             'appleFieldSlots' => WalletStudioDefaults::appleFieldSlots(),
             'googleFieldSlots' => WalletStudioDefaults::googleFieldSlots(),
+            'storageBase' => rtrim((string) asset('storage'), '/'),
+            'appUrl' => rtrim((string) config('app.url'), '/'),
         ]);
     }
 
@@ -57,15 +59,24 @@ class WalletStudioController extends Controller
 
     public function upload(Request $request): JsonResponse
     {
-        $request->validate([
-            'image' => 'required|image|max:4096',
-        ]);
+        $kind = (string) $request->input('kind', 'image');
+        $isStampIcon = in_array($kind, ['stamp_completed', 'stamp_empty'], true);
 
-        $path = $request->file('image')->store('wallet-studio', 'public');
+        if ($isStampIcon) {
+            $request->validate([
+                'image' => 'required|file|mimes:png|max:4096',
+            ]);
+        } else {
+            $request->validate([
+                'image' => 'required|image|max:4096',
+            ]);
+        }
+
+        $path = str_replace('\\', '/', $request->file('image')->store('wallet-studio', 'public'));
 
         return response()->json([
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => $this->publicStorageUrl($path),
         ]);
     }
 
@@ -126,10 +137,17 @@ class WalletStudioController extends Controller
     /**
      * @return array<string, mixed>
      */
+    protected function publicStorageUrl(string $path): string
+    {
+        $path = str_replace('\\', '/', ltrim($path, '/'));
+
+        return Storage::disk('public')->url($path);
+    }
+
     protected function validateStudio(Request $request): array
     {
         return $request->validate([
-            'platform' => 'required|in:apple,google,both',
+            'platform' => 'required|in:apple,google',
             'preview_locale' => 'required|in:ar,en',
             'preview_stamps_filled' => 'required|integer|min:0|max:50',
             'preview_stamps_total' => 'required|integer|min:1|max:50',
@@ -141,6 +159,10 @@ class WalletStudioController extends Controller
             'logo_url' => 'nullable|string|max:500',
             'strip_bg_path' => 'nullable|string|max:255',
             'strip_bg_url' => 'nullable|string|max:500',
+            'stamp_completed_icon_path' => 'nullable|string|max:255',
+            'stamp_completed_icon_url' => 'nullable|string|max:500',
+            'stamp_empty_icon_path' => 'nullable|string|max:255',
+            'stamp_empty_icon_url' => 'nullable|string|max:500',
             'apple_background' => 'nullable|string|max:20',
             'apple_foreground' => 'nullable|string|max:20',
             'apple_label' => 'nullable|string|max:20',

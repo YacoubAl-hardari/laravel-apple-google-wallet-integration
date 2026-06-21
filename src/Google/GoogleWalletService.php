@@ -9,12 +9,17 @@ use Google\Service\Walletobjects\Image;
 use Google\Service\Walletobjects\LoyaltyClass;
 use Google\Service\Walletobjects\LoyaltyObject;
 use Illuminate\Support\Facades\Log;
+use Yacoubalhaidari\AppleGoogleWallet\Concerns\ResolvesPaths;
 use Yacoubalhaidari\AppleGoogleWallet\Contracts\BuildsGoogleLoyaltyPayload;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData;
 
 class GoogleWalletService
 {
+    use ResolvesPaths;
+
+    protected ?string $lastError = null;
+
     public function __construct(
         protected StampCardImageGenerator $stampCardImageGenerator,
         protected WalletImageUrlResolver $imageUrlResolver,
@@ -89,10 +94,29 @@ class GoogleWalletService
                 $this->objectPayloadArray($program, $member),
             ]);
         } catch (\Throwable $e) {
+            $this->lastError = $this->humanizeError($e->getMessage());
             Log::error('GoogleWalletService saveUrl: ' . $e->getMessage());
 
             return null;
         }
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    protected function humanizeError(string $message): string
+    {
+        if (str_contains($message, 'Invalid image URL') || str_contains($message, 'Could not load image')) {
+            return 'Google لا يستطيع تحميل الشعار — تأكد أن GOOGLE_WALLET_FALLBACK_LOGO يرجّع صورة PNG/JPG حقيقية (ليس صفحة HTML).';
+        }
+
+        if (str_contains($message, 'SSL certificate problem')) {
+            return 'خطأ SSL محلي عند الاتصال بـ Google — راجع إعدادات cacert.pem في PHP.';
+        }
+
+        return $message;
     }
 
     public function objectExists(MemberCardData $member): bool
@@ -238,7 +262,7 @@ class GoogleWalletService
 
     protected function credentialsPath(): string
     {
-        return (string) config('google-wallet.service_account_json');
+        return $this->resolvePath((string) config('google-wallet.service_account_json'));
     }
 
     protected function getClient(): Client

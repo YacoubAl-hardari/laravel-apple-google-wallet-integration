@@ -18,9 +18,45 @@ class WalletStudioConfigApplier
             'wallet-studio.lang' => $input['lang_' . $locale] ?? [],
         ]);
 
-        $platform = (string) ($input['platform'] ?? 'both');
+        $platform = (string) ($input['platform'] ?? 'apple');
 
-        if (in_array($platform, ['apple', 'both'], true)) {
+        if (! empty($input['logo_path'])) {
+            $local = storage_path('app/public/' . ltrim(str_replace('\\', '/', (string) $input['logo_path']), '/'));
+            config([
+                'apple-wallet.icon_path' => $local,
+                'apple-wallet.logo_path' => $local,
+            ]);
+        }
+
+        if (! empty($input['strip_bg_path'])) {
+            $storagePath = '/storage/' . ltrim(str_replace('\\', '/', (string) $input['strip_bg_path']), '/');
+            config([
+                'apple-wallet.strip_background_image' => $storagePath,
+                'google-wallet.stamp_strip_background_image' => $storagePath,
+            ]);
+        }
+
+        if (! empty($input['stamp_completed_icon_path'])) {
+            $local = storage_path('app/public/' . ltrim(str_replace('\\', '/', (string) $input['stamp_completed_icon_path']), '/'));
+            config([
+                'apple-wallet.stamp_completed_icon' => $local,
+                'google-wallet.stamp_completed_icon' => $local,
+            ]);
+        }
+
+        if (! empty($input['stamp_empty_icon_path'])) {
+            $local = storage_path('app/public/' . ltrim(str_replace('\\', '/', (string) $input['stamp_empty_icon_path']), '/'));
+            config([
+                'apple-wallet.stamp_empty_icon' => $local,
+                'google-wallet.stamp_empty_icon' => $local,
+            ]);
+        }
+
+        if (! empty($input['logo_url'])) {
+            config(['google-wallet.default_logo' => $input['logo_url']]);
+        }
+
+        if ($platform === 'apple') {
             config([
                 'apple-wallet.foreground_color' => AppleColorNormalizer::normalize($input['apple_foreground'] ?? '#FFFFFF'),
                 'apple-wallet.background_color' => AppleColorNormalizer::normalize($input['apple_background'] ?? '#8B5E3C'),
@@ -36,27 +72,9 @@ class WalletStudioConfigApplier
                     'auxiliary' => array_values($input['apple_auxiliary_order'] ?? ['member', 'status']),
                 ],
             ]);
-
-            if (! empty($input['logo_path'])) {
-                $local = storage_path('app/public/' . ltrim((string) $input['logo_path'], '/'));
-                config([
-                    'apple-wallet.icon_path' => $local,
-                    'apple-wallet.logo_path' => $local,
-                ]);
-            }
-
-            if (! empty($input['logo_url'])) {
-                config(['google-wallet.default_logo' => $input['logo_url']]);
-            }
-
-            if (! empty($input['strip_bg_path'])) {
-                $storagePath = '/storage/' . ltrim((string) $input['strip_bg_path'], '/');
-                config(['apple-wallet.strip_background_image' => $storagePath]);
-                config(['google-wallet.stamp_strip_background_image' => $storagePath]);
-            }
         }
 
-        if (in_array($platform, ['google', 'both'], true)) {
+        if ($platform === 'google') {
             config([
                 'google-wallet.hex_background_color' => $input['google_background'] ?? '#8B5E3C',
                 'google-wallet.stamp_columns' => (int) ($input['stamp_columns'] ?? 5),
@@ -72,9 +90,6 @@ class WalletStudioConfigApplier
                 ],
             ]);
 
-            if (! empty($input['logo_url'])) {
-                config(['google-wallet.default_logo' => $input['logo_url']]);
-            }
         }
     }
 }
