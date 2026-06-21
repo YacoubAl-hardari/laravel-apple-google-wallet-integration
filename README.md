@@ -36,7 +36,7 @@ Laravel package for generating **Apple Wallet** loyalty passes in `.pkpass` form
 | Requirement | Details                                         |
 | ----------- | ----------------------------------------------- |
 | PHP         | 8.2 or newer                                    |
-| Laravel     | 11 or 12                                        |
+| Laravel     | 11 or newer                                         |
 | Extensions  | `openssl`, `zip`, `gd`                          |
 | Apple       | Pass Type ID + `.p12` certificate + WWDR `.pem` |
 | Google      | Service Account JSON + Issuer ID                |
