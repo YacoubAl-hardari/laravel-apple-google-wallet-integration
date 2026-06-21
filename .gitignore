@@ -1,0 +1,8 @@
+/storage/app/apple-wallet/**
+!/storage/app/apple-wallet/.gitkeep
+!/storage/app/apple-wallet/assets/
+/storage/app/apple-wallet/assets/**
+!/storage/app/apple-wallet/assets/.gitkeep
+/vendor/
+composer.lock
+.phpunit.result.cache
