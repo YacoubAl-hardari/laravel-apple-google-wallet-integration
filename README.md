@@ -12,6 +12,7 @@ Laravel package for generating **Apple Wallet** (`.pkpass`) and **Google Wallet*
 - **Extensible builders** via contracts + config
 - **Events** for customizing payloads
 - **Arabic & English** translations (`lang/ar`, `lang/en`)
+- **Wallet Design Studio** — visual config builder (local/dev)
 - Config renamed: `apple-wallet.php` (replaces `passgenerator.php`)
 
 ## Requirements
@@ -99,6 +100,40 @@ php artisan vendor:publish --tag=apple-google-wallet-lang
 ```
 
 Files are published to `lang/vendor/apple-google-wallet/{ar,en}/wallet.php`.
+
+## Wallet Design Studio
+
+Visual builder for **allowed design elements** (colors, stamps, labels) with live mockup preview and config export.
+
+Enabled by default when `APP_ENV=local`. Open:
+
+```
+http://your-app.test/wallet-studio
+```
+
+Force enable in production (optional):
+
+```env
+WALLET_STUDIO_ENABLED=true
+WALLET_STUDIO_ROUTE=wallet-studio
+```
+
+The studio exports:
+
+- `apple-wallet.php` design keys + `fields` layout
+- `google-wallet.php` design keys + `fields` layout
+- `lang/ar/wallet.php` and `lang/en/wallet.php`
+- `.env.wallet` snippet
+
+Studio features:
+
+- Live mockup preview (Apple + Google)
+- **Real strip preview** via GD generators
+- Drag & drop field ordering within allowed slots
+- Logo / strip background upload
+- ZIP export + **test `.pkpass` download** (when Apple certificates configured)
+
+> Preview is approximate — Apple and Google render cards with slight differences on real devices.
 
 ## Usage
 

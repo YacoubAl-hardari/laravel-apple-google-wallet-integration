@@ -40,65 +40,107 @@ class DefaultApplePassDefinitionBuilder implements BuildsApplePassDefinition
             'labelColor' => AppleColorNormalizer::normalize(config('apple-wallet.label_color'), 'rgb(255, 255, 255)'),
             'barcode' => $barcode,
             'barcodes' => [$barcode],
-            'storeCard' => [
-                'primaryFields' => [
-                    [
-                        'key' => 'balance',
-                        'label' => wallet_trans('stamps'),
-                        'value' => "{$progress} / {$required}",
-                    ],
-                ],
-                'secondaryFields' => [
-                    [
-                        'key' => 'rewards',
-                        'label' => wallet_trans('rewards'),
-                        'value' => (string) $member->rewardsEarned,
-                    ],
-                    [
-                        'key' => 'remaining',
-                        'label' => wallet_trans('remaining'),
-                        'value' => (string) $remaining,
-                    ],
-                ],
-                'auxiliaryFields' => [
-                    [
-                        'key' => 'member',
-                        'label' => wallet_trans('member'),
-                        'value' => $memberName !== '' ? $memberName : (string) $member->id,
-                    ],
-                    [
-                        'key' => 'status',
-                        'label' => wallet_trans('status'),
-                        'value' => $member->isCompleted
-                            ? wallet_trans('status_completed')
-                            : wallet_trans('status_in_progress'),
-                    ],
-                ],
-                'backFields' => [
-                    [
-                        'key' => 'program',
-                        'label' => wallet_trans('program'),
-                        'value' => $program->name,
-                    ],
-                    [
-                        'key' => 'reward',
-                        'label' => wallet_trans('reward'),
-                        'value' => wallet_trans('reward_description', [
-                            'count' => $program->rewardCount,
-                            'required' => $required,
-                        ]),
-                    ],
-                    [
-                        'key' => 'scan_code',
-                        'label' => wallet_trans('card_code'),
-                        'value' => $member->qrCode,
-                    ],
-                ],
-            ],
+            'storeCard' => $this->buildStoreCard($program, $member, $required, $progress, $remaining, $memberName),
         ];
 
         event(new ApplePassDefinitionBuilding($program, $member, $definition));
 
         return $definition;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildStoreCard(
+        LoyaltyProgramData $program,
+        MemberCardData $member,
+        int $required,
+        int $progress,
+        int $remaining,
+        string $memberName,
+    ): array {
+        $fields = config('apple-wallet.fields', []);
+        $visible = $fields['visible'] ?? ['rewards', 'remaining', 'member', 'status'];
+        $secondaryOrder = $fields['secondary'] ?? ['rewards', 'remaining'];
+        $auxiliaryOrder = $fields['auxiliary'] ?? ['member', 'status'];
+
+        $secondaryMap = [
+            'rewards' => [
+                'key' => 'rewards',
+                'label' => wallet_trans('rewards'),
+                'value' => (string) $member->rewardsEarned,
+            ],
+            'remaining' => [
+                'key' => 'remaining',
+                'label' => wallet_trans('remaining'),
+                'value' => (string) $remaining,
+            ],
+        ];
+
+        $auxiliaryMap = [
+            'member' => [
+                'key' => 'member',
+                'label' => wallet_trans('member'),
+                'value' => $memberName !== '' ? $memberName : (string) $member->id,
+            ],
+            'status' => [
+                'key' => 'status',
+                'label' => wallet_trans('status'),
+                'value' => $member->isCompleted
+                    ? wallet_trans('status_completed')
+                    : wallet_trans('status_in_progress'),
+            ],
+        ];
+
+        return [
+            'primaryFields' => [[
+                'key' => 'balance',
+                'label' => wallet_trans('stamps'),
+                'value' => "{$progress} / {$required}",
+            ]],
+            'secondaryFields' => $this->pickFields($secondaryMap, $secondaryOrder, $visible),
+            'auxiliaryFields' => $this->pickFields($auxiliaryMap, $auxiliaryOrder, $visible),
+            'backFields' => [
+                [
+                    'key' => 'program',
+                    'label' => wallet_trans('program'),
+                    'value' => $program->name,
+                ],
+                [
+                    'key' => 'reward',
+                    'label' => wallet_trans('reward'),
+                    'value' => wallet_trans('reward_description', [
+                        'count' => $program->rewardCount,
+                        'required' => $required,
+                    ]),
+                ],
+                [
+                    'key' => 'scan_code',
+                    'label' => wallet_trans('card_code'),
+                    'value' => $member->qrCode,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $map
+     * @param  array<int, string>  $order
+     * @param  array<int, string>  $visible
+     * @return array<int, array<string, string>>
+     */
+    protected function pickFields(array $map, array $order, array $visible): array
+    {
+        $picked = [];
+
+        foreach ($order as $key) {
+            if (! in_array($key, $visible, true) || ! isset($map[$key])) {
+                continue;
+            }
+
+            $picked[] = $map[$key];
+        }
+
+        return $picked;
     }
 }

@@ -93,27 +93,18 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
                 'alternateText' => ' ',
             ]),
             'loyaltyPoints' => $this->buildStampPoints($member, $program),
-            'secondaryLoyaltyPoints' => new LoyaltyPoints([
+            'textModulesData' => $this->buildTextModules($member, $program),
+        ];
+
+        $visible = config('google-wallet.fields.visible', ['rewards', 'remaining', 'status']);
+        if (in_array('rewards', $visible, true)) {
+            $payload['secondaryLoyaltyPoints'] = new LoyaltyPoints([
                 'label' => Str::limit(wallet_trans('rewards'), 9, ''),
                 'balance' => new LoyaltyPointsBalance([
                     'int' => $member->rewardsEarned,
                 ]),
-            ]),
-            'textModulesData' => [
-                new TextModuleData([
-                    'id' => 'visits_remaining',
-                    'header' => wallet_trans('remaining'),
-                    'body' => (string) max(0, $program->requiredStamps - $member->stampsProgress),
-                ]),
-                new TextModuleData([
-                    'id' => 'stamp_status',
-                    'header' => wallet_trans('status'),
-                    'body' => $member->isCompleted
-                        ? wallet_trans('status_completed')
-                        : wallet_trans('status_in_progress'),
-                ]),
-            ],
-        ];
+            ]);
+        }
 
         if ($heroImage) {
             $payload['heroImage'] = $heroImage;
@@ -210,5 +201,39 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
                 'string' => "{$progress} / {$required}",
             ]),
         ]);
+    }
+
+    /**
+     * @return array<int, TextModuleData>
+     */
+    protected function buildTextModules(MemberCardData $member, LoyaltyProgramData $program): array
+    {
+        $fields = config('google-wallet.fields', []);
+        $visible = $fields['visible'] ?? ['remaining', 'status'];
+        $order = $fields['modules'] ?? ['remaining', 'status'];
+
+        $map = [
+            'remaining' => new TextModuleData([
+                'id' => 'visits_remaining',
+                'header' => wallet_trans('remaining'),
+                'body' => (string) max(0, $program->requiredStamps - $member->stampsProgress),
+            ]),
+            'status' => new TextModuleData([
+                'id' => 'stamp_status',
+                'header' => wallet_trans('status'),
+                'body' => $member->isCompleted
+                    ? wallet_trans('status_completed')
+                    : wallet_trans('status_in_progress'),
+            ]),
+        ];
+
+        $modules = [];
+        foreach ($order as $key) {
+            if (in_array($key, $visible, true) && isset($map[$key])) {
+                $modules[] = $map[$key];
+            }
+        }
+
+        return $modules;
     }
 }

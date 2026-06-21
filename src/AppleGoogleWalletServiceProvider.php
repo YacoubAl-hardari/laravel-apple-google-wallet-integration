@@ -2,6 +2,7 @@
 
 namespace Yacoubalhaidari\AppleGoogleWallet;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Yacoubalhaidari\AppleGoogleWallet\Apple\AppleStampStripGenerator;
 use Yacoubalhaidari\AppleGoogleWallet\Apple\AppleWalletService;
@@ -19,6 +20,7 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/apple-wallet.php', 'apple-wallet');
         $this->mergeConfigFrom(__DIR__ . '/../config/google-wallet.php', 'google-wallet');
+        $this->mergeConfigFrom(__DIR__ . '/../config/studio.php', 'wallet-studio');
 
         $this->app->singleton(BuildsApplePassDefinition::class, function ($app) {
             $builder = config('apple-wallet.pass_definition_builder', DefaultApplePassDefinitionBuilder::class);
@@ -42,10 +44,12 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'apple-google-wallet');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'apple-google-wallet');
 
         $this->publishes([
             __DIR__ . '/../config/apple-wallet.php' => config_path('apple-wallet.php'),
             __DIR__ . '/../config/google-wallet.php' => config_path('google-wallet.php'),
+            __DIR__ . '/../config/studio.php' => config_path('wallet-studio.php'),
         ], 'apple-google-wallet-config');
 
         $this->publishes([
@@ -53,6 +57,26 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
         ], 'apple-google-wallet-lang');
 
         $this->registerAppleWalletStorageDisk();
+        $this->registerStudioRoutes();
+    }
+
+    protected function registerStudioRoutes(): void
+    {
+        if (! config('wallet-studio.enabled', false)) {
+            return;
+        }
+
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
+        $prefix = (string) config('wallet-studio.route_prefix', 'wallet-studio');
+        $middleware = config('wallet-studio.middleware', ['web']);
+
+        Route::middleware($middleware)
+            ->prefix($prefix)
+            ->name('wallet-studio.')
+            ->group(__DIR__ . '/../routes/web.php');
     }
 
     protected function registerAppleWalletStorageDisk(): void
