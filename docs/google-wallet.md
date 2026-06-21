@@ -1,17 +1,13 @@
-# دليل Google Wallet
+# Google Wallet Guide
 
-> **قريباً** — هذا الملف سيُكمَّل لاحقاً بشرح إعداد Google Wallet API خطوة بخطوة.
+This file gives a quick setup path for **Google Wallet** with `yacoubalhaidari/laravel-apple-google-wallet-integration`.
 
-## الوثائق
+| File                               | Status                                              |
+| ---------------------------------- | --------------------------------------------------- |
+| [apple-wallet.md](apple-wallet.md) | Ready - Apple Wallet certificates, setup, and usage |
+| This file                          | Google Wallet setup and usage                       |
 
-| الملف | الحالة |
-|-------|--------|
-| [apple-wallet.md](apple-wallet.md) | جاهز — شهادات + إعداد + استخدام |
-| **google-wallet.md** | قيد الإعداد |
-
----
-
-## الإعداد المؤقت (`.env`)
+## Quick `.env` setup
 
 ```env
 GOOGLE_WALLET_ISSUER_ID=3388000000000000000
@@ -24,14 +20,14 @@ GOOGLE_WALLET_FALLBACK_LOGO=https://cdn.example.com/logo.png
 GOOGLE_WALLET_PUBLIC_ASSET_BASE_URL=https://cdn.example.com
 ```
 
-## ملفات المشروع
+## Project files
 
 ```text
 storage/app/google-wallet/
 └── service-account.json
 ```
 
-## استخدام سريع
+## Quick usage
 
 ```php
 use Yacoubalhaidari\AppleGoogleWallet\Google\GoogleWalletService;
@@ -39,6 +35,4 @@ use Yacoubalhaidari\AppleGoogleWallet\Google\GoogleWalletService;
 $url = app(GoogleWalletService::class)->saveUrl($program, $member);
 ```
 
----
-
-ارجع إلى [README](../README.md) للتفاصيل الكاملة حتى نشر هذا الدليل.
+Return to [README](../README.md) for the full package overview.

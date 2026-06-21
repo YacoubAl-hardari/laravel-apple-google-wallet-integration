@@ -2,60 +2,52 @@
 
 ![Laravel Apple & Google Wallet Integration](image.png)
 
-مكتبة Laravel لتوليد بطاقات ولاء **Apple Wallet** بصيغة `.pkpass` وروابط **Google Wallet**، مع دعم بطاقات الأختام وتوليد صور الأختام للمنصتين.
+Laravel package for generating **Apple Wallet** loyalty passes in `.pkpass` format and **Google Wallet** save links, with stamp-card support and stamp image generation for both platforms.
 
-**المطور:** [Yacoub Alhaidari](https://yacoubalhaidari.com)
+**Author:** [Yacoub Alhaidari](https://yacoubalhaidari.com)
 
----
+## Contents
 
-## جدول المحتويات
-
-- [المميزات](#المميزات)
-- [المتطلبات](#المتطلبات)
-- [التثبيت](#التثبيت)
-- [الإعداد السريع](#الإعداد-السريع)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Setup](#quick-setup)
 - [Wallet Design Studio](#wallet-design-studio)
-- [الاستخدام](#الاستخدام)
-- [التوسعة](#التوسعة)
-- [الوثائق](#الوثائق)
-- [الترجمة](#الترجمة)
-- [الترخيص](#الترخيص)
+- [Usage](#usage)
+- [Extensibility](#extensibility)
+- [Docs](#docs)
+- [Localization](#localization)
+- [License](#license)
 
----
+## Features
 
-## المميزات
+- Generate **Apple Wallet** passes as `.pkpass` files.
+- Create **Google Wallet** save links with JWT.
+- Create or update Google Loyalty Class/Object data.
+- Stamp-card support with a GD-based image generator.
+- DTO-first API without a direct Eloquent dependency.
+- Swappable builders for Apple and Google pass definitions.
+- Events fired before pass definitions are built.
+- English is the default documentation language.
+- Local **Wallet Design Studio** for previewing and exporting settings.
 
-- توليد بطاقات **Apple Wallet** بصيغة `.pkpass`.
-- إنشاء روابط حفظ **Google Wallet** باستخدام JWT.
-- إنشاء أو تحديث Google Loyalty Class/Object.
-- دعم بطاقات الأختام مع مولد صور مبني على GD.
-- API مبني على DTOs بدون ربط مباشر مع Eloquent.
-- Builders قابلة للاستبدال لتخصيص تعريفات Apple و Google.
-- Events قبل بناء تعريفات البطاقات.
-- ترجمة عربية وإنجليزية.
-- **Wallet Design Studio** محلي لتجربة الإعدادات وتصديرها.
+## Requirements
 
----
+| Requirement | Details                                         |
+| ----------- | ----------------------------------------------- |
+| PHP         | 8.2 or newer                                    |
+| Laravel     | 11 or 12                                        |
+| Extensions  | `openssl`, `zip`, `gd`                          |
+| Apple       | Pass Type ID + `.p12` certificate + WWDR `.pem` |
+| Google      | Service Account JSON + Issuer ID                |
 
-## المتطلبات
-
-| المتطلب    | التفاصيل                                        |
-| ---------- | ----------------------------------------------- |
-| PHP        | 8.2 أو أحدث                                     |
-| Laravel    | 11 أو 12                                        |
-| Extensions | `openssl`, `zip`, `gd`                          |
-| Apple      | Pass Type ID + شهادة `.p12` + شهادة WWDR `.pem` |
-| Google     | Service Account JSON + Issuer ID                |
-
----
-
-## التثبيت
+## Installation
 
 ```bash
 composer require yacoubalhaidari/laravel-apple-google-wallet-integration
 ```
 
-انشر ملفات الإعداد والترجمة عند الحاجة:
+Publish the config and language files when needed:
 
 ```bash
 php artisan vendor:publish --tag=apple-google-wallet-config
@@ -63,15 +55,13 @@ php artisan vendor:publish --tag=apple-google-wallet-lang
 php artisan storage:link
 ```
 
----
+## Quick Setup
 
-## الإعداد السريع
-
-ضع شهادات Apple داخل `storage/app/apple-wallet/` وملف Google Service Account داخل `storage/app/google-wallet/`، ثم اضبط القيم الأساسية في `.env`:
+Place the Apple certificates in `storage/app/apple-wallet/` and the Google Service Account file in `storage/app/google-wallet/`, then set the core values in `.env`:
 
 ```env
 APP_URL=https://example.com
-WALLET_LOCALE=ar
+WALLET_LOCALE=en
 
 APPLE_WALLET_PASS_TYPE_IDENTIFIER=pass.com.example.yourapp
 APPLE_WALLET_TEAM_IDENTIFIER=XXXXXXXXXX
@@ -90,7 +80,7 @@ GOOGLE_WALLET_FALLBACK_LOGO=https://example.com/images/logo.png
 GOOGLE_WALLET_PUBLIC_ASSET_BASE_URL=https://example.com
 ```
 
-إعدادات الأختام الاختيارية:
+Optional stamp settings:
 
 ```env
 APPLE_WALLET_STAMP_COMPLETED_ICON=public/images/stamps/completed.png
@@ -102,37 +92,33 @@ GOOGLE_WALLET_STAMP_EMPTY_ICON=public/images/stamps/empty.png
 GOOGLE_WALLET_STAMP_STRIP_BG_IMAGE=/images/stamps/STAMP_BG.jpeg
 ```
 
-يمكنك فحص الإعدادات من Tinker:
+Inspect the current setup from Tinker:
 
 ```php
 app(\Yacoubalhaidari\AppleGoogleWallet\Apple\AppleWalletService::class)->configurationReport();
 app(\Yacoubalhaidari\AppleGoogleWallet\Google\GoogleWalletService::class)->configurationReport();
 ```
 
----
-
 ## Wallet Design Studio
 
-الاستوديو يعمل تلقائيًا في بيئة `local`، ويمكن فتحه من:
+The studio runs automatically in `local` and can be opened at:
 
 ```text
 http://your-app.test/wallet-studio
 ```
 
-يمكن تغيير المسار أو التفعيل من `.env`:
+You can change the route or enable it from `.env`:
 
 ```env
 WALLET_STUDIO_ENABLED=true
 WALLET_STUDIO_ROUTE=wallet-studio
 ```
 
-يفيد الاستوديو في معاينة ألوان وتصميم البطاقة، رفع الأيقونات، توليد Preview، تصدير إعدادات `.env`، وتجربة إنشاء بطاقة اختبار.
+It helps preview colors and layout, upload icons, generate previews, export `.env` settings, and test sample card creation.
 
----
+## Usage
 
-## الاستخدام
-
-### تجهيز DTOs
+### Prepare DTOs
 
 ```php
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData;
@@ -180,11 +166,9 @@ $saveUrl = GoogleWallet::saveUrl($program, $member);
 GoogleWallet::updateLoyaltyCard($program, $member);
 ```
 
----
+## Extensibility
 
-## التوسعة
-
-يمكن استبدال Builders الافتراضية من ملفات الإعداد:
+You can replace the default builders from the config files:
 
 ```php
 // config/apple-wallet.php
@@ -194,50 +178,45 @@ GoogleWallet::updateLoyaltyCard($program, $member);
 'payload_builder' => App\Wallet\CustomGooglePayloadBuilder::class,
 ```
 
-الأحداث المتاحة:
+Available events:
 
 ```php
 Yacoubalhaidari\AppleGoogleWallet\Events\ApplePassDefinitionBuilding::class
 Yacoubalhaidari\AppleGoogleWallet\Events\GoogleLoyaltyObjectBuilding::class
 ```
 
----
+## Docs
 
-## الوثائق
+| File                                                 | Content                                     |
+| ---------------------------------------------------- | ------------------------------------------- |
+| [docs/apple-wallet.md](docs/apple-wallet.md)         | Apple Wallet setup, certificates, and usage |
+| [docs/google-wallet.md](docs/google-wallet.md)       | Google Wallet setup and Service Account     |
+| [docs/README.md](docs/README.md)                     | Documentation index                         |
+| [README.ar.md](README.ar.md)                         | Arabic overview for the package             |
+| [config/apple-wallet.php](config/apple-wallet.php)   | Apple Wallet options                        |
+| [config/google-wallet.php](config/google-wallet.php) | Google Wallet options                       |
+| [config/studio.php](config/studio.php)               | Wallet Design Studio options                |
 
-| الملف                                                | المحتوى                                 |
-| ---------------------------------------------------- | --------------------------------------- |
-| [docs/apple-wallet.md](docs/apple-wallet.md)         | إعداد Apple Wallet والشهادات والاستخدام |
-| [docs/google-wallet.md](docs/google-wallet.md)       | إعداد Google Wallet و Service Account   |
-| [docs/README.md](docs/README.md)                     | فهرس الوثائق                            |
-| [config/apple-wallet.php](config/apple-wallet.php)   | خيارات Apple Wallet                     |
-| [config/google-wallet.php](config/google-wallet.php) | خيارات Google Wallet                    |
-| [config/studio.php](config/studio.php)               | خيارات Wallet Design Studio             |
+## Localization
 
----
-
-## الترجمة
-
-القيمة الافتراضية يمكن ضبطها من:
+The default locale can be set with:
 
 ```env
-WALLET_LOCALE=ar
+WALLET_LOCALE=en
 ```
 
-واستخدام الترجمة:
+Use translations like this:
 
 ```php
 wallet_trans('stamps');
 ```
 
-لنشر ملفات الترجمة:
+To publish the language files:
 
 ```bash
 php artisan vendor:publish --tag=apple-google-wallet-lang
 ```
 
----
-
-## الترخيص
+## License
 
 MIT - Yacoub Alhaidari
