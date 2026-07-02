@@ -1924,9 +1924,6 @@
                 </div>
                 <span class="apple-pass-type">Loyalty</span>
             </div>
-            <div class="${stripClass('google')}" style="${stripStyle('google')}">
-                ${realStripUrls.google ? '' : renderStamps(Math.min(state.preview_stamps_total, 10), Math.min(filled, 10), state.google_stamp_filled, 'background:'+state.google_stamp_empty+'; border-color: '+state.google_stamp_border)}
-            </div>
             <div class="card-body" style="--g-bg:${state.google_background}; color:#fff">
                 <div class="fields">
                     ${googleFieldsHtml(L, filled, remaining)}
@@ -1935,6 +1932,9 @@
                     <div class="qr"></div>
                     <div style="font-size:.7rem; opacity:.7; text-align: center;">${escapeHtml(L.barcode_footer)}</div>
                 </div>
+            </div>
+            <div class="${stripClass('google')}" style="${stripStyle('google')}">
+                ${realStripUrls.google ? '' : renderStamps(Math.min(state.preview_stamps_total, 10), Math.min(filled, 10), state.google_stamp_filled, 'background:'+state.google_stamp_empty+'; border-color: '+state.google_stamp_border)}
             </div>`;
             }
 

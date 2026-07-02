@@ -261,4 +261,144 @@ trait InteractsWithStampImages
             hexdec(substr($hex, 4, 2)),
         ];
     }
+
+    /**
+     * Paste an icon onto a canvas centered at ($centerX, $centerY) with optional
+     * dimming. $dim is a percentage 0–100; 100 = fully opaque, 0 = invisible.
+     *
+     * When $dim < 100 the icon is first composed onto a temporary RGBA layer
+     * with the requested alpha and then blended into the canvas, so it works
+     * correctly even when the canvas itself has no alpha channel.
+     */
+    protected function pasteImageWithAlpha(
+        $canvas,
+        $icon,
+        int $centerX,
+        int $centerY,
+        int $iconSize,
+        int $dim = 100
+    ): void {
+        $dim = max(0, min(100, $dim));
+        $destX = $centerX - (int) ($iconSize / 2);
+        $destY = $centerY - (int) ($iconSize / 2);
+
+        if ($dim === 100) {
+            // Fully opaque — fast path identical to pasteStampIcon
+            imagealphablending($canvas, true);
+            imagesavealpha($canvas, true);
+            imagecopyresampled(
+                $canvas, $icon,
+                $destX, $destY, 0, 0,
+                $iconSize, $iconSize,
+                imagesx($icon), imagesy($icon)
+            );
+
+            return;
+        }
+
+        // Create a temporary true-colour buffer with alpha support
+        $tmp = imagecreatetruecolor($iconSize, $iconSize);
+        if (! $tmp) {
+            return;
+        }
+
+        imagealphablending($tmp, false);
+        imagesavealpha($tmp, true);
+
+        // Fill with fully-transparent background
+        $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
+        imagefilledrectangle($tmp, 0, 0, $iconSize - 1, $iconSize - 1, $transparent);
+
+        // Draw the icon scaled onto the temp buffer
+        imagealphablending($tmp, true);
+        imagecopyresampled(
+            $tmp, $icon,
+            0, 0, 0, 0,
+            $iconSize, $iconSize,
+            imagesx($icon), imagesy($icon)
+        );
+
+        // Apply the dim level by re-mapping the alpha channel
+        // GD alpha: 0 = opaque, 127 = fully transparent
+        $alpha = (int) round(127 * (1 - $dim / 100));
+
+        for ($px = 0; $px < $iconSize; $px++) {
+            for ($py = 0; $py < $iconSize; $py++) {
+                $pixel = imagecolorat($tmp, $px, $py);
+                $r = ($pixel >> 16) & 0xFF;
+                $g = ($pixel >> 8) & 0xFF;
+                $b = $pixel & 0xFF;
+                $a = ($pixel >> 24) & 0x7F;
+
+                // Combine existing pixel alpha with the requested dim alpha
+                $newAlpha = min(127, $a + $alpha);
+                $newColor = imagecolorallocatealpha($tmp, $r, $g, $b, $newAlpha);
+                imagesetpixel($tmp, $px, $py, $newColor);
+            }
+        }
+
+        // Blend the dimmed icon onto the canvas
+        imagealphablending($canvas, true);
+        imagecopy($canvas, $tmp, $destX, $destY, 0, 0, $iconSize, $iconSize);
+
+        imagedestroy($tmp);
+    }
+
+    /**
+     * Draw a filled rounded rectangle.
+     * $r is the corner radius (auto-capped so it never exceeds half the side).
+     */
+    protected function drawRoundedFilledRect(
+        $image,
+        int $x,
+        int $y,
+        int $w,
+        int $h,
+        int $r,
+        $color
+    ): void {
+        $r = min($r, (int) ($w / 2), (int) ($h / 2));
+
+        // Body rectangles
+        imagefilledrectangle($image, $x + $r,     $y,     $x + $w - $r, $y + $h,     $color);
+        imagefilledrectangle($image, $x,           $y + $r, $x + $w,     $y + $h - $r, $color);
+
+        // Four corner ellipses
+        imagefilledellipse($image, $x + $r,       $y + $r,       $r * 2, $r * 2, $color);
+        imagefilledellipse($image, $x + $w - $r,  $y + $r,       $r * 2, $r * 2, $color);
+        imagefilledellipse($image, $x + $r,       $y + $h - $r,  $r * 2, $r * 2, $color);
+        imagefilledellipse($image, $x + $w - $r,  $y + $h - $r,  $r * 2, $r * 2, $color);
+    }
+
+    /**
+     * Draw the outline of a rounded rectangle.
+     * $thickness controls the line width (pixels).
+     */
+    protected function drawRoundedRectBorder(
+        $image,
+        int $x,
+        int $y,
+        int $w,
+        int $h,
+        int $r,
+        $color,
+        int $thickness = 1
+    ): void {
+        $r = min($r, (int) ($w / 2), (int) ($h / 2));
+        imagesetthickness($image, $thickness);
+
+        // Straight edges
+        imageline($image, $x + $r,       $y,       $x + $w - $r, $y,       $color);
+        imageline($image, $x + $r,       $y + $h,  $x + $w - $r, $y + $h,  $color);
+        imageline($image, $x,            $y + $r,  $x,           $y + $h - $r, $color);
+        imageline($image, $x + $w,       $y + $r,  $x + $w,      $y + $h - $r, $color);
+
+        // Corner arcs (top-left, top-right, bottom-left, bottom-right)
+        imagearc($image, $x + $r,       $y + $r,       $r * 2, $r * 2, 180, 270, $color);
+        imagearc($image, $x + $w - $r,  $y + $r,       $r * 2, $r * 2, 270, 360, $color);
+        imagearc($image, $x + $r,       $y + $h - $r,  $r * 2, $r * 2,  90, 180, $color);
+        imagearc($image, $x + $w - $r,  $y + $h - $r,  $r * 2, $r * 2,   0,  90, $color);
+
+        imagesetthickness($image, 1);
+    }
 }
