@@ -3,11 +3,13 @@
 namespace Yacoubalhaidari\AppleGoogleWallet\Apple;
 
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Yacoubalhaidari\AppleGoogleWallet\Contracts\BuildsApplePassDefinition;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData;
 use Yacoubalhaidari\AppleGoogleWallet\Events\ApplePassDefinitionBuilding;
 use Yacoubalhaidari\AppleGoogleWallet\Support\AppleColorNormalizer;
+use Yacoubalhaidari\AppleGoogleWallet\Support\RetailPassValidation;
 
 class DefaultApplePassDefinitionBuilder implements BuildsApplePassDefinition
 {
@@ -20,6 +22,16 @@ class DefaultApplePassDefinitionBuilder implements BuildsApplePassDefinition
         $progress = min($required, max(0, $member->stampsProgress));
         $remaining = max(0, $required - $progress);
         $memberName = Str::limit(trim($member->memberName), 20, '');
+        RetailPassValidation::state($member->state);
+        $validFrom = RetailPassValidation::date($member->validFrom, 'valid_from');
+        $expiresAt = RetailPassValidation::date($member->validUntil, 'valid_until');
+
+        if ($validFrom !== null && $expiresAt !== null && $expiresAt <= $validFrom) {
+            throw new InvalidArgumentException('A loyalty card must expire after its start time.');
+        }
+
+        $locations = $member->merchantLocations ?? $program->merchantLocations ?? [];
+        RetailPassValidation::locations($locations);
 
         $barcode = [
             'message' => $member->qrCode,
@@ -41,7 +53,35 @@ class DefaultApplePassDefinitionBuilder implements BuildsApplePassDefinition
             'barcode' => $barcode,
             'barcodes' => [$barcode],
             'storeCard' => $this->buildStoreCard($program, $member, $required, $progress, $remaining, $memberName),
+            'voided' => $member->state !== 'ACTIVE',
         ];
+
+        if ($expiresAt !== null) {
+            $definition['expirationDate'] = $expiresAt->format(DATE_ATOM);
+        }
+
+        if ($validFrom !== null) {
+            $definition['storeCard']['backFields'][] = [
+                'key' => 'valid_from',
+                'label' => wallet_trans('valid_from'),
+                'value' => $validFrom->format(DATE_ATOM),
+                'dateStyle' => 'PKDateStyleMedium',
+                'timeStyle' => 'PKDateStyleShort',
+            ];
+        }
+
+        if ($locations !== []) {
+            $definition['locations'] = array_map(fn (array $location): array => [
+                'latitude' => (float) $location['latitude'],
+                'longitude' => (float) $location['longitude'],
+            ], $locations);
+        }
+
+        $contact = config('apple-wallet.organization_contact');
+
+        if (is_string($contact) && trim($contact) !== '') {
+            $definition['storeCard']['backFields'][] = ['key' => 'contact', 'label' => wallet_trans('contact'), 'value' => $contact];
+        }
 
         event(new ApplePassDefinitionBuilding($program, $member, $definition));
 
@@ -133,7 +173,7 @@ class DefaultApplePassDefinitionBuilder implements BuildsApplePassDefinition
     {
         $picked = [];
 
-        foreach ($order as $key) {
+        foreach (array_unique($order) as $key) {
             if (! in_array($key, $visible, true) || ! isset($map[$key])) {
                 continue;
             }

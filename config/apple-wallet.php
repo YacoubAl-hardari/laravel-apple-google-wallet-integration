@@ -1,9 +1,12 @@
 <?php
 
+use Yacoubalhaidari\AppleGoogleWallet\Apple\DefaultApplePassDefinitionBuilder;
+
 return [
     'pass_type_identifier' => env('APPLE_WALLET_PASS_TYPE_IDENTIFIER'),
     'team_identifier' => env('APPLE_WALLET_TEAM_IDENTIFIER'),
     'organization_name' => env('APPLE_WALLET_ORGANIZATION_NAME', env('APP_NAME', 'App')),
+    'organization_contact' => env('APPLE_WALLET_ORGANIZATION_CONTACT'),
     'foreground_color' => env('APPLE_WALLET_FOREGROUND_COLOR', 'rgb(255, 255, 255)'),
     'background_color' => env('APPLE_WALLET_BACKGROUND_COLOR', 'rgb(139, 94, 60)'),
     'label_color' => env('APPLE_WALLET_LABEL_COLOR', 'rgb(255, 255, 255)'),
@@ -38,5 +41,5 @@ return [
     'wwdr_certificate_path' => env('APPLE_WALLET_WWDR_CERTIFICATE', storage_path('app/apple-wallet/AppleWWDRCAG6.pem')),
 
     // Override the default pass definition builder
-    'pass_definition_builder' => \Yacoubalhaidari\AppleGoogleWallet\Apple\DefaultApplePassDefinitionBuilder::class,
+    'pass_definition_builder' => DefaultApplePassDefinitionBuilder::class,
 ];

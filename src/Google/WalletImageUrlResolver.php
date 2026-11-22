@@ -2,6 +2,9 @@
 
 namespace Yacoubalhaidari\AppleGoogleWallet\Google;
 
+use Illuminate\Support\Facades\Http;
+use Throwable;
+
 class WalletImageUrlResolver
 {
     public function resolve(?string $url): ?string
@@ -13,11 +16,11 @@ class WalletImageUrlResolver
 
         $url = $this->rewriteWithPublicBase($url);
 
-        if (!$this->isPubliclyAccessible($url)) {
+        if (! $this->isPubliclyAccessible($url)) {
             return $this->fallbackLogo();
         }
 
-        if (!str_starts_with(strtolower($url), 'https://')) {
+        if (! str_starts_with(strtolower($url), 'https://')) {
             return $this->fallbackLogo();
         }
 
@@ -37,11 +40,11 @@ class WalletImageUrlResolver
 
         $url = $this->rewriteWithPublicBase($url);
 
-        if (!$this->isPubliclyAccessible($url)) {
+        if (! $this->isPubliclyAccessible($url)) {
             return null;
         }
 
-        if (!str_starts_with(strtolower($url), 'https://')) {
+        if (! str_starts_with(strtolower($url), 'https://')) {
             return null;
         }
 
@@ -79,19 +82,23 @@ class WalletImageUrlResolver
             return $url;
         }
 
-        $appUrl = rtrim((string) config('app.url'), '/');
-        if ($appUrl !== '' && str_starts_with($url, $appUrl)) {
-            return $publicBase . substr($url, strlen($appUrl));
+        $parsed = parse_url($url);
+        $app = parse_url(rtrim((string) config('app.url'), '/'));
+
+        if ($parsed === false || $app === false) {
+            return $url;
         }
 
-        $storagePath = '/storage/';
-        $parsed = parse_url($url);
-        $path = $parsed['path'] ?? '';
+        $sameOrigin = isset($parsed['host'], $app['host'])
+            && strcasecmp($parsed['host'], $app['host']) === 0
+            && ($parsed['scheme'] ?? '') === ($app['scheme'] ?? '')
+            && ($parsed['port'] ?? 443) === ($app['port'] ?? 443);
 
-        if ($path !== '' && str_contains($path, $storagePath)) {
-            $suffix = substr($path, strpos($path, $storagePath));
+        if ($sameOrigin || (! isset($parsed['host']) && str_starts_with($url, '/storage/'))) {
+            $path = $parsed['path'] ?? '';
+            $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
 
-            return $publicBase . $suffix;
+            return $publicBase.$path.$query;
         }
 
         return $url;
@@ -99,16 +106,19 @@ class WalletImageUrlResolver
 
     protected function isPubliclyAccessible(string $url): bool
     {
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        if ($host === '') {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
             return false;
         }
 
-        if (in_array($host, ['localhost', '127.0.0.1', '0.0.0.0', '::1'], true)) {
+        $parts = parse_url($url);
+        $host = rtrim(strtolower(trim($parts['host'] ?? '', '[]')), '.');
+
+        if (($parts['scheme'] ?? '') !== 'https' || isset($parts['user']) || isset($parts['pass'])
+            || ($parts['port'] ?? 443) !== 443 || $host === '' || $host === 'localhost') {
             return false;
         }
 
-        if (str_ends_with($host, '.test') || str_ends_with($host, '.local') || str_ends_with($host, '.invalid')) {
+        if (preg_match('/\.(?:test|local|localhost|internal|invalid|lan|home)$/D', $host)) {
             return false;
         }
 
@@ -120,37 +130,18 @@ class WalletImageUrlResolver
             );
         }
 
-        return true;
+        return str_contains($host, '.');
     }
 
     protected function isValidImageUrl(string $url): bool
     {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'HEAD',
-                'timeout' => 8,
-                'ignore_errors' => true,
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
-
-        $headers = @get_headers($url, true, $context);
-        if (! is_array($headers) || ! isset($headers[0])) {
+        try {
+            $response = Http::connectTimeout(3)->timeout(8)->withoutRedirecting()->head($url);
+        } catch (Throwable) {
             return false;
         }
 
-        if (! preg_match('/\s200\s/', (string) $headers[0])) {
-            return false;
-        }
-
-        $type = $headers['Content-Type'] ?? $headers['content-type'] ?? '';
-        if (is_array($type)) {
-            $type = (string) end($type);
-        }
-
-        return str_starts_with(strtolower((string) $type), 'image/');
+        return $response->status() === 200
+            && str_starts_with(strtolower((string) $response->header('Content-Type')), 'image/');
     }
 }

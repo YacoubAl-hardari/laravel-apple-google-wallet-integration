@@ -16,20 +16,24 @@ use Google\Service\Walletobjects\LoyaltyPointsBalance;
 use Google\Service\Walletobjects\Message;
 use Google\Service\Walletobjects\TextModuleData;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Yacoubalhaidari\AppleGoogleWallet\Contracts\BuildsGoogleLoyaltyPayload;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData;
 use Yacoubalhaidari\AppleGoogleWallet\Events\GoogleLoyaltyObjectBuilding;
+use Yacoubalhaidari\AppleGoogleWallet\Support\RetailPassValidation;
 
 class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
 {
     public function __construct(
         protected WalletImageUrlResolver $imageUrlResolver,
-    ) {
-    }
+    ) {}
 
     public function buildClass(LoyaltyProgramData $program): LoyaltyClass
     {
+        RetailPassValidation::locations($program->merchantLocations ?? []);
+        RetailPassValidation::countryCode($program->countryCode);
+        RetailPassValidation::links($program->merchantLinks ?? []);
         $required = max(1, $program->requiredStamps);
 
         $payload = [
@@ -63,7 +67,7 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
         ];
 
         $logoUri = $this->logoUri($program);
-        if (!$logoUri) {
+        if (! $logoUri) {
             throw new \RuntimeException(wallet_trans('google_logo_required'));
         }
 
@@ -71,6 +75,18 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
 
         if ($this->isStampLayout()) {
             $payload['classTemplateInfo'] = $this->buildStampClassTemplateInfo();
+        }
+
+        if ($program->merchantLocations !== null) {
+            $payload['merchantLocations'] = $this->merchantLocationPayload($program->merchantLocations);
+        }
+
+        if ($program->countryCode !== null) {
+            $payload['countryCode'] = $program->countryCode;
+        }
+
+        if ($program->merchantLinks !== null) {
+            $payload['linksModuleData'] = ['uris' => $program->merchantLinks];
         }
 
         return new LoyaltyClass($payload);
@@ -81,20 +97,55 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
         MemberCardData $member,
         ?Image $heroImage = null,
     ): LoyaltyObject {
+        RetailPassValidation::state($member->state);
+        RetailPassValidation::locations($member->merchantLocations ?? []);
+        $validFrom = RetailPassValidation::date($member->validFrom, 'valid_from');
+        $validUntil = RetailPassValidation::date($member->validUntil, 'valid_until');
+
+        if ($validFrom !== null && $validUntil !== null && $validUntil <= $validFrom) {
+            throw new InvalidArgumentException('valid_until must be after valid_from.');
+        }
+
         $payload = [
             'id' => $this->objectId($member),
             'classId' => $this->classId($program),
-            'state' => 'active',
+            'state' => $member->state,
             'accountName' => Str::limit(trim($member->memberName), 20, ''),
             'accountId' => (string) $member->id,
             'barcode' => new Barcode([
-                'type' => 'qrCode',
+                'type' => 'QR_CODE',
                 'value' => $member->qrCode,
                 'alternateText' => ' ',
             ]),
             'loyaltyPoints' => $this->buildStampPoints($member, $program),
             'textModulesData' => $this->buildTextModules($member, $program),
         ];
+
+        if ($member->linkedOfferIds !== null) {
+            $linkedOfferIds = [];
+
+            foreach ($member->linkedOfferIds as $offerId) {
+                if (! is_string($offerId)) {
+                    throw new InvalidArgumentException('linked_offer_ids must contain Google Wallet object IDs.');
+                }
+
+                $linkedOfferIds[] = $this->validatedWalletId($offerId);
+            }
+
+            $payload['linkedOfferIds'] = array_values(array_unique($linkedOfferIds));
+        }
+
+        if ($validFrom !== null) {
+            $payload['validTimeInterval']['start'] = ['date' => $validFrom->format(DATE_ATOM)];
+        }
+
+        if ($validUntil !== null) {
+            $payload['validTimeInterval']['end'] = ['date' => $validUntil->format(DATE_ATOM)];
+        }
+
+        if ($member->merchantLocations !== null) {
+            $payload['merchantLocations'] = $this->merchantLocationPayload($member->merchantLocations);
+        }
 
         $visible = config('google-wallet.fields.visible', ['rewards', 'remaining', 'status']);
         if (in_array('rewards', $visible, true)) {
@@ -119,12 +170,38 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
 
     public function classId(LoyaltyProgramData $program): string
     {
-        return config('google-wallet.issuer_id') . '.stamp_' . $this->slug($program->name);
+        return $this->validatedWalletId($program->walletClassId
+            ?? config('google-wallet.issuer_id').'.stamp_'.$this->slug($program->name));
     }
 
     public function objectId(MemberCardData $member): string
     {
-        return config('google-wallet.issuer_id') . '.member_' . $this->slug((string) $member->id);
+        return $this->validatedWalletId($member->walletObjectId
+            ?? config('google-wallet.issuer_id').'.member_'.$this->slug((string) $member->id));
+    }
+
+    protected function validatedWalletId(string $identifier): string
+    {
+        $issuerId = (string) config('google-wallet.issuer_id');
+
+        if (! preg_match('/\A[0-9]+\z/', $issuerId)
+            || ! preg_match('/\A'.preg_quote($issuerId, '/').'\.[A-Za-z0-9._-]+\z/', $identifier)) {
+            throw new InvalidArgumentException('Google Wallet IDs must use the configured issuer and an alphanumeric, dot, underscore, or hyphen suffix.');
+        }
+
+        return $identifier;
+    }
+
+    /**
+     * @param  list<array{latitude: int|float|string, longitude: int|float|string}>  $locations
+     * @return list<array{latitude: float, longitude: float}>
+     */
+    protected function merchantLocationPayload(array $locations): array
+    {
+        return array_map(fn (array $location): array => [
+            'latitude' => (float) $location['latitude'],
+            'longitude' => (float) $location['longitude'],
+        ], $locations);
     }
 
     protected function slug(string $value): string
@@ -155,10 +232,10 @@ class DefaultGoogleLoyaltyPayloadBuilder implements BuildsGoogleLoyaltyPayload
         }
 
         if ($color[0] !== '#') {
-            $color = '#' . $color;
+            $color = '#'.$color;
         }
 
-        if (!preg_match('/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/', $color)) {
+        if (! preg_match('/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/', $color)) {
             return '#8B5E3C';
         }
 

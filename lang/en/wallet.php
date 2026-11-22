@@ -1,6 +1,17 @@
 <?php
 
 return [
+    'balance' => 'Balance',
+    'card_number' => 'Card number',
+    'pin' => 'PIN',
+    'expires' => 'Expires',
+    'provider' => 'Provider',
+    'offer_details' => 'Offer details',
+    'terms' => 'Terms and conditions',
+    'redeem_online' => 'Redeem online',
+    'valid_from' => 'Valid from',
+    'balance_updated' => 'Balance updated',
+    'contact' => 'Contact',
     'stamps' => 'Stamps',
     'rewards' => 'Rewards',
     'remaining' => 'Remaining',

@@ -1,6 +1,17 @@
 <?php
 
 return [
+    'balance' => 'الرصيد',
+    'card_number' => 'رقم البطاقة',
+    'pin' => 'الرقم السري',
+    'expires' => 'تاريخ الانتهاء',
+    'provider' => 'مقدم العرض',
+    'offer_details' => 'تفاصيل العرض',
+    'terms' => 'الشروط والأحكام',
+    'redeem_online' => 'استخدام العرض عبر الإنترنت',
+    'valid_from' => 'صالح من',
+    'balance_updated' => 'آخر تحديث للرصيد',
+    'contact' => 'للتواصل',
     'stamps' => 'الأختام',
     'rewards' => 'المكافآت',
     'remaining' => 'المتبقي',

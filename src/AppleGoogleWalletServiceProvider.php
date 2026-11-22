@@ -18,9 +18,9 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/apple-wallet.php', 'apple-wallet');
-        $this->mergeConfigFrom(__DIR__ . '/../config/google-wallet.php', 'google-wallet');
-        $this->mergeConfigFrom(__DIR__ . '/../config/studio.php', 'wallet-studio');
+        $this->mergeConfigFrom(__DIR__.'/../config/apple-wallet.php', 'apple-wallet');
+        $this->mergeConfigFrom(__DIR__.'/../config/google-wallet.php', 'google-wallet');
+        $this->mergeConfigFrom(__DIR__.'/../config/studio.php', 'wallet-studio');
 
         $this->app->singleton(BuildsApplePassDefinition::class, function ($app) {
             $builder = config('apple-wallet.pass_definition_builder', DefaultApplePassDefinitionBuilder::class);
@@ -43,17 +43,17 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'apple-google-wallet');
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'apple-google-wallet');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'apple-google-wallet');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'apple-google-wallet');
 
         $this->publishes([
-            __DIR__ . '/../config/apple-wallet.php' => config_path('apple-wallet.php'),
-            __DIR__ . '/../config/google-wallet.php' => config_path('google-wallet.php'),
-            __DIR__ . '/../config/studio.php' => config_path('wallet-studio.php'),
+            __DIR__.'/../config/apple-wallet.php' => config_path('apple-wallet.php'),
+            __DIR__.'/../config/google-wallet.php' => config_path('google-wallet.php'),
+            __DIR__.'/../config/studio.php' => config_path('wallet-studio.php'),
         ], 'apple-google-wallet-config');
 
         $this->publishes([
-            __DIR__ . '/../lang' => lang_path('vendor/apple-google-wallet'),
+            __DIR__.'/../lang' => lang_path('vendor/apple-google-wallet'),
         ], 'apple-google-wallet-lang');
 
         $this->registerAppleWalletStorageDisk();
@@ -76,12 +76,16 @@ class AppleGoogleWalletServiceProvider extends ServiceProvider
         Route::middleware($middleware)
             ->prefix($prefix)
             ->name('wallet-studio.')
-            ->group(__DIR__ . '/../routes/web.php');
+            ->group(__DIR__.'/../routes/web.php');
     }
 
     protected function registerAppleWalletStorageDisk(): void
     {
         $diskName = (string) config('apple-wallet.storage_disk', 'apple-wallet');
+
+        if (config("filesystems.disks.{$diskName}") !== null) {
+            return;
+        }
 
         config([
             "filesystems.disks.{$diskName}" => [

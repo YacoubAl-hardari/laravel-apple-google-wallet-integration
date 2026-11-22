@@ -10,6 +10,8 @@ use Yacoubalhaidari\AppleGoogleWallet\Apple\AppleWalletService;
  * @method static array<string, array<string, mixed>> configurationReport()
  * @method static string passIdentifier(\Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData $member)
  * @method static string|null createPass(\Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData $program, \Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData $member)
+ * @method static string|null createGiftCard(\Yacoubalhaidari\AppleGoogleWallet\DTOs\GiftCardData $card)
+ * @method static string|null createOffer(\Yacoubalhaidari\AppleGoogleWallet\DTOs\OfferData $offer)
  * @method static string|null getLastError()
  *
  * @see AppleWalletService

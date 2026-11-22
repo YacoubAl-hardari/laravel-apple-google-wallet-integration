@@ -1,9 +1,14 @@
 <?php
 
+use Yacoubalhaidari\AppleGoogleWallet\Google\DefaultGoogleLoyaltyPayloadBuilder;
+
 return [
     'issuer_id' => env('GOOGLE_WALLET_ISSUER_ID'),
     'service_account_json' => env('GOOGLE_WALLET_SERVICE_ACCOUNT_JSON', storage_path('app/google-wallet/service-account.json')),
     'issuer_name' => env('GOOGLE_WALLET_ISSUER_NAME', env('APP_NAME', 'App')),
+    'origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('GOOGLE_WALLET_ORIGINS', env('APP_URL', '')))))),
+    'connect_timeout' => 5,
+    'timeout' => 20,
     'hex_background_color' => env('GOOGLE_WALLET_HEX_BACKGROUND', '#8B5E3C'),
     'default_logo' => env('GOOGLE_WALLET_DEFAULT_LOGO'),
     // Public HTTPS base used to rewrite local /storage URLs for Google Wallet (production CDN/domain)
@@ -57,6 +62,5 @@ return [
     ],
 
     // Override the default Google Wallet payload builder
-    'payload_builder' => \Yacoubalhaidari\AppleGoogleWallet\Google\DefaultGoogleLoyaltyPayloadBuilder::class,
+    'payload_builder' => DefaultGoogleLoyaltyPayloadBuilder::class,
 ];
-

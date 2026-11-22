@@ -12,7 +12,7 @@ class AppleStampStripGenerator
 
     public function generate(LoyaltyProgramData $program, MemberCardData $member): ?string
     {
-        if (!extension_loaded('gd')) {
+        if (! extension_loaded('gd')) {
             return null;
         }
 
@@ -26,7 +26,7 @@ class AppleStampStripGenerator
         $gap = max(8, (int) config('apple-wallet.stamp_gap', 22));
 
         $image = imagecreatetruecolor($width, $height);
-        if (!$image) {
+        if (! $image) {
             return null;
         }
 
@@ -74,7 +74,7 @@ class AppleStampStripGenerator
         $relativePath = sprintf(
             '%s/card_%s_%d_of_%d.png',
             $basePath,
-            $member->id,
+            hash('sha256', $program->id."\0".(string) $member->id),
             $filled,
             $total
         );

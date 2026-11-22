@@ -2,11 +2,16 @@
 
 namespace Yacoubalhaidari\AppleGoogleWallet\Apple;
 
+use Closure;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 use Yacoubalhaidari\AppleGoogleWallet\Concerns\ResolvesPaths;
 use Yacoubalhaidari\AppleGoogleWallet\Contracts\BuildsApplePassDefinition;
+use Yacoubalhaidari\AppleGoogleWallet\DTOs\GiftCardData;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\LoyaltyProgramData;
 use Yacoubalhaidari\AppleGoogleWallet\DTOs\MemberCardData;
+use Yacoubalhaidari\AppleGoogleWallet\DTOs\OfferData;
 
 class AppleWalletService
 {
@@ -17,12 +22,12 @@ class AppleWalletService
     public function __construct(
         protected AppleStampStripGenerator $stampStripGenerator,
         protected BuildsApplePassDefinition $passDefinitionBuilder,
-    ) {
-    }
+        protected ?DefaultAppleRetailPassDefinitionBuilder $retailPassDefinitionBuilder = null,
+    ) {}
 
     public function isConfigured(): bool
     {
-        return collect($this->configurationReport())->every(fn (array $item) => (bool) ($item['ok'] ?? false));
+        return collect($this->configurationReport())->every(fn (array $item): bool => (bool) ($item['ok'] ?? false));
     }
 
     /**
@@ -36,32 +41,31 @@ class AppleWalletService
         $wwdrPath = $this->resolvePath((string) config('apple-wallet.wwdr_certificate_path'));
         $iconPath = $this->resolvePath((string) config('apple-wallet.icon_path'));
         $certPassword = (string) config('apple-wallet.certificate_store_password');
+        $certificates = [];
+        $certificateStore = is_file($certPath) && is_readable($certPath) ? file_get_contents($certPath) : false;
+        $canOpenCertificate = $certificateStore !== false
+            && @openssl_pkcs12_read($certificateStore, $certificates, $certPassword);
 
         return [
-            'pass_type_identifier' => [
-                'ok' => $passType !== '',
-                'value' => $passType !== '' ? $passType : null,
-            ],
-            'team_identifier' => [
-                'ok' => $teamId !== '',
-                'value' => $teamId !== '' ? $teamId : null,
-            ],
+            'pass_type_identifier' => ['ok' => $passType !== '', 'value' => $passType !== '' ? $passType : null],
+            'team_identifier' => ['ok' => $teamId !== '', 'value' => $teamId !== '' ? $teamId : null],
             'certificate_store_path' => [
-                'ok' => is_readable($certPath),
+                'ok' => $canOpenCertificate,
                 'configured' => config('apple-wallet.certificate_store_path'),
                 'resolved' => $certPath,
             ],
             'certificate_store_password' => [
-                'ok' => $certPassword !== '',
+                'ok' => $canOpenCertificate,
                 'configured' => $certPassword !== '' ? '[set]' : '[empty]',
             ],
             'wwdr_certificate_path' => [
-                'ok' => is_readable($wwdrPath),
+                'ok' => is_file($wwdrPath) && is_readable($wwdrPath)
+                    && @openssl_x509_read(file_get_contents($wwdrPath)) !== false,
                 'configured' => config('apple-wallet.wwdr_certificate_path'),
                 'resolved' => $wwdrPath,
             ],
             'icon_path' => [
-                'ok' => is_readable($iconPath),
+                'ok' => is_file($iconPath) && is_readable($iconPath),
                 'configured' => config('apple-wallet.icon_path'),
                 'resolved' => $iconPath,
             ],
@@ -70,71 +74,32 @@ class AppleWalletService
 
     public function passIdentifier(MemberCardData $member): string
     {
-        return 'loyalty_member_' . $member->id;
+        return 'loyalty_member_'.$member->id;
     }
 
     public function createPass(LoyaltyProgramData $program, MemberCardData $member): ?string
     {
-        if (!$this->isConfigured()) {
-            Log::debug('AppleWalletService.createPass skipped', [
-                'member_id' => $member->id,
-                'reason' => 'not_configured',
-                'checks' => $this->configurationReport(),
-            ]);
+        return $this->createSignedPass(
+            fn (): array => $this->passDefinitionBuilder->build($program, $member),
+            fn (): array => $this->resolveAssets($program, $member),
+            $this->passIdentifier($member),
+        );
+    }
 
-            return null;
-        }
+    public function createGiftCard(GiftCardData $card): ?string
+    {
+        return $this->createSignedPass(
+            fn (): array => $this->retailBuilder()->buildGiftCard($card),
+            fn (): array => $this->resolveBaseAssets(),
+        );
+    }
 
-        try {
-            $passId = $this->passIdentifier($member);
-
-            Log::debug('AppleWalletService.createPass start', [
-                'pass_id' => $passId,
-                'member_id' => $member->id,
-                'program_id' => $program->id,
-            ]);
-
-            $this->applyResolvedCertificatePaths();
-
-            $pass = new PkPassGenerator($passId, true);
-            $pass->setPassDefinition($this->passDefinitionBuilder->build($program, $member));
-
-            $assets = $this->resolveAssets($program, $member);
-
-            Log::debug('AppleWalletService.createPass assets', [
-                'pass_id' => $passId,
-                'assets' => $assets,
-            ]);
-
-            foreach ($assets as $assetPath) {
-                $pass->addAsset($assetPath);
-            }
-
-            $pkpass = $pass->create();
-
-            Log::debug('AppleWalletService.createPass success', [
-                'pass_id' => $passId,
-                'bytes' => strlen($pkpass),
-            ]);
-
-            $this->lastError = null;
-
-            return $pkpass;
-        } catch (\Throwable $e) {
-            $this->lastError = $e->getMessage();
-
-            Log::error('AppleWalletService.createPass failed', [
-                'member_id' => $member->id,
-                'program_id' => $program->id,
-                'message' => $e->getMessage(),
-                'exception' => get_class($e),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'checks' => $this->configurationReport(),
-            ]);
-
-            return null;
-        }
+    public function createOffer(OfferData $offer): ?string
+    {
+        return $this->createSignedPass(
+            fn (): array => $this->retailBuilder()->buildOffer($offer),
+            fn (): array => $this->resolveBaseAssets(),
+        );
     }
 
     public function getLastError(): ?string
@@ -143,73 +108,123 @@ class AppleWalletService
     }
 
     /**
-     * @return array<int, string>
+     * @param  Closure(): array<string, mixed>  $definition
+     * @param  Closure(): array<int|string, string>  $assets
+     */
+    protected function createSignedPass(Closure $definition, Closure $assets, ?string $passId = null): ?string
+    {
+        if (! $this->isConfigured()) {
+            $this->lastError = 'Apple Wallet signing credentials or required assets are not configured.';
+
+            return null;
+        }
+
+        try {
+            $this->applyResolvedCertificatePaths();
+            $passDefinition = $definition();
+            $passId ??= (string) $passDefinition['serialNumber'];
+            $pass = new PkPassGenerator($passId, true);
+            $pass->setPassDefinition($passDefinition);
+
+            foreach ($assets() as $archiveName => $assetPath) {
+                $pass->addAsset($assetPath, is_string($archiveName) ? $archiveName : null);
+            }
+
+            $pkpass = $pass->create();
+            $this->lastError = null;
+
+            return $pkpass;
+        } catch (Throwable $exception) {
+            $this->lastError = $exception->getMessage();
+
+            Log::error('Apple Wallet pass creation failed.', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string, string>
      */
     protected function resolveAssets(LoyaltyProgramData $program, MemberCardData $member): array
     {
-        $assets = [];
-
-        $iconPath = $this->resolvePath((string) config('apple-wallet.icon_path'));
-        if (is_readable($iconPath)) {
-            $assets[] = $this->copyAssetAs($iconPath, 'icon.png');
-        }
-
-        $logoPath = $this->resolvePath((string) config('apple-wallet.logo_path'));
-        if (is_readable($logoPath)) {
-            $assets[] = $this->copyAssetAs($logoPath, 'logo.png');
-        }
-
+        $assets = $this->resolveBaseAssets($program->logoPath);
         $stripPath = $this->resolveStripPath($program, $member);
-        if ($stripPath) {
-            $assets[] = $this->copyAssetAs($stripPath, 'strip.png');
+
+        if ($stripPath !== null) {
+            $assets['strip.png'] = $stripPath;
         }
 
-        return array_values(array_filter($assets));
+        return $assets;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function resolveBaseAssets(?string $programLogoPath = null): array
+    {
+        $assets = [];
+        $logoPath = $programLogoPath === null ? '' : $this->resolvePath($programLogoPath);
+        $paths = [
+            'icon' => $this->resolvePath((string) config('apple-wallet.icon_path')),
+            'logo' => is_file($logoPath) && is_readable($logoPath)
+                ? $logoPath
+                : $this->resolvePath((string) config('apple-wallet.logo_path')),
+        ];
+
+        foreach ($paths as $name => $path) {
+            if (is_file($path) && is_readable($path)) {
+                $assets[$name.'.png'] = $path;
+
+                foreach ([2, 3] as $scale) {
+                    $variant = dirname($path).DIRECTORY_SEPARATOR.pathinfo($path, PATHINFO_FILENAME).'@'.$scale.'x.png';
+
+                    if (is_file($variant) && is_readable($variant)) {
+                        $assets[$name.'@'.$scale.'x.png'] = $variant;
+                    }
+                }
+            }
+        }
+
+        return $assets;
     }
 
     protected function resolveStripPath(LoyaltyProgramData $program, MemberCardData $member): ?string
     {
         $url = $this->stampStripGenerator->generate($program, $member);
-        if (!$url) {
+
+        if ($url === null) {
             return null;
         }
 
+        $disk = Storage::disk((string) config('apple-wallet.public_disk', 'public'));
         $path = parse_url($url, PHP_URL_PATH);
-        if (!is_string($path) || !str_contains($path, '/storage/')) {
+        $basePath = parse_url($disk->url(''), PHP_URL_PATH);
+
+        if (! is_string($path) || ! is_string($basePath)
+            || ! str_starts_with($path, rtrim($basePath, '/').'/')) {
             return null;
         }
 
-        $relative = ltrim(substr($path, strpos($path, '/storage/') + strlen('/storage/')), '/');
-        $local = storage_path('app/public/' . $relative);
+        $relative = ltrim(substr($path, strlen(rtrim($basePath, '/'))), '/');
+        $local = $disk->path($relative);
 
-        return is_file($local) ? $local : null;
-    }
-
-    protected function copyAssetAs(string $sourcePath, string $targetFilename): string
-    {
-        $tempDir = storage_path('app/apple-wallet/assets');
-        if (!is_dir($tempDir)) {
-            mkdir($tempDir, 0777, true);
-        }
-
-        $targetPath = $tempDir . DIRECTORY_SEPARATOR . $targetFilename;
-
-        if (!is_file($targetPath) || filemtime($targetPath) < filemtime($sourcePath)) {
-            copy($sourcePath, $targetPath);
-        }
-
-        return $targetPath;
+        return is_file($local) && is_readable($local) ? $local : null;
     }
 
     protected function applyResolvedCertificatePaths(): void
     {
         config([
-            'apple-wallet.certificate_store_path' => $this->resolvePath(
-                (string) config('apple-wallet.certificate_store_path')
-            ),
-            'apple-wallet.wwdr_certificate_path' => $this->resolvePath(
-                (string) config('apple-wallet.wwdr_certificate_path')
-            ),
+            'apple-wallet.certificate_store_path' => $this->resolvePath((string) config('apple-wallet.certificate_store_path')),
+            'apple-wallet.wwdr_certificate_path' => $this->resolvePath((string) config('apple-wallet.wwdr_certificate_path')),
         ]);
+    }
+
+    protected function retailBuilder(): DefaultAppleRetailPassDefinitionBuilder
+    {
+        return $this->retailPassDefinitionBuilder ??= new DefaultAppleRetailPassDefinitionBuilder;
     }
 }
